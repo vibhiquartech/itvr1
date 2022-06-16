@@ -26,6 +26,9 @@ import Loading from './Loading';
 import { useKeycloak } from '@react-keycloak/web';
 import BCSCInfo from './BCSCInfo';
 import { addTokenFields } from '../keycloak';
+import DateFnsUtils from '@date-io/date-fns';
+import { KeyboardDatePicker, MuiPickersUtilsProvider } from '@material-ui/pickers';
+
 
 export const defaultValues = {
   sin: '',
@@ -47,6 +50,7 @@ export const defaultValues = {
 
 const Form = ({ setNumberOfErrors, setErrorsExistCounter }) => {
   const [loading, setLoading] = useState(false);
+  const [selectedDate, handleDateChange] = useState(new Date());
   const queryClient = useQueryClient();
   const { keycloak } = useKeycloak();
   const kcToken = keycloak.tokenParsed;
@@ -256,12 +260,15 @@ const Form = ({ setNumberOfErrors, setErrorsExistCounter }) => {
                 name="date_of_birth"
                 control={control}
                 render={({ field }) => (
-                  <TextField
-                    sx={{ width: '300px' }}
-                    id="date_of_birth"
-                    type="date"
-                    onChange={(e) => setValue('date_of_birth', e.target.value)}
-                  />
+                  <MuiPickersUtilsProvider utils={DateFnsUtils}>
+                    <KeyboardDatePicker  clearable
+                      value={selectedDate}
+                      format="yyyy-MM-dd"
+                      placeholder="1990/10/10"
+                      onChange={date => handleDateChange(date)}
+                      // minDate={new Date()}
+                      />
+                  </MuiPickersUtilsProvider>
                 )}
                 rules={{
                   validate: (inputtedDOB) => {
