@@ -22,7 +22,9 @@ from api.constants import (
 from api.utility import get_applicant_full_name
 from django_q.tasks import async_task
 from func_timeout import func_timeout, FunctionTimedOut
-
+from sequences import get_next_value
+from .services import cra
+from datetime import date
 
 def get_email_service_token() -> str:
     client_id = settings.EMAIL["EMAIL_SERVICE_CLIENT_ID"]
@@ -475,6 +477,7 @@ def cancel_untouched_household_applications():
 
 
 def expire_expired_applications():
+    print('hello')
     expired_rebates = GoElectricRebate.objects.filter(redeemed=False).filter(
         expiry_date__lte=timezone.now().date()
     )
@@ -488,3 +491,60 @@ def expire_expired_applications():
         status=GoElectricRebateApplication.Status.EXPIRED,
         modified=timezone.now(),
     )
+
+def get_verified_applications_last_24hours():
+    rebates =  GoElectricRebateApplication.objects.filter(
+        status=GoElectricRebateApplication.Status.VERIFIED,
+        created__gte=timezone.now() - timedelta(days=1),
+    )
+    data = []
+    cra_env = settings.CRA_ENVIRONMENT
+    cra_sequence = get_next_value("cra_sequence")
+    program_code = "BCVR"
+
+    for rebate in rebates:
+        data.append(
+            {
+                "sin": rebate.sin,
+                "years": [rebate.tax_year],
+                "given_name": rebate.first_name,
+                "family_name": rebate.last_name,
+                "birth_date": rebate.date_of_birth.strftime("%Y%m%d"),
+                "application_id": rebate.id,
+            }
+        )
+
+        # TODO this should be some kind of enum like the status is.
+        if rebate.application_type == "household":
+            household_member = rebate.householdmember
+            data.append(
+                {
+                    "sin": household_member.sin,
+                    "years": [rebate.tax_year],
+                    "given_name": household_member.first_name,
+                    "family_name": household_member.last_name,
+                    "birth_date": household_member.date_of_birth.strftime("%Y%m%d"),
+                    "application_id": rebate.id,
+                }
+            )
+
+    filename = get_cra_filename(program_code, cra_env, cra_sequence)
+    today = date.today().strftime("%Y%m%d")
+    with open(filename, "w") as file1:
+        res = cra.write(
+                data,
+                today=today,
+                program_code=program_code,
+                cra_env=cra_env,
+                cra_sequence=f"{cra_sequence:05}",
+            )
+        file1.write(res)
+  
+def get_cra_filename(program_code="BCVR", cra_env="A", cra_sequence="00001"):
+        filename = "TO.{cra_env}TO#@@00.R7005.IN.{program_code}.{cra_env}{cra_sequence:05}".format(
+            cra_env=cra_env, cra_sequence=cra_sequence, program_code=program_code
+        )
+        print(filename)
+        return filename
+
+        
