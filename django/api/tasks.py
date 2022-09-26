@@ -25,6 +25,8 @@ from func_timeout import func_timeout, FunctionTimedOut
 from sequences import get_next_value
 from .services import cra
 from datetime import date
+import boto3
+import os
 
 def get_email_service_token() -> str:
     client_id = settings.EMAIL["EMAIL_SERVICE_CLIENT_ID"]
@@ -530,7 +532,7 @@ def get_verified_applications_last_24hours():
 
     filename = get_cra_filename(program_code, cra_env, cra_sequence)
     today = date.today().strftime("%Y%m%d")
-    with open(filename, "w") as file1:
+    with open(filename, "w") as file:
         res = cra.write(
                 data,
                 today=today,
@@ -538,13 +540,32 @@ def get_verified_applications_last_24hours():
                 cra_env=cra_env,
                 cra_sequence=f"{cra_sequence:05}",
             )
-        file1.write(res)
+        file.write(res)
+    upload_to_s3(filename)
   
-def get_cra_filename(program_code="BCVR", cra_env="A", cra_sequence="00001"):
-        filename = "TO.{cra_env}TO#@@00.R7005.IN.{program_code}.{cra_env}{cra_sequence:05}".format(
-            cra_env=cra_env, cra_sequence=cra_sequence, program_code=program_code
-        )
-        print(filename)
-        return filename
 
-        
+def get_cra_filename(program_code="BCVR", cra_env="A", cra_sequence="00001"):
+    filename = "TO.{cra_env}TO#@@00.R7005.IN.{program_code}.{cra_env}{cra_sequence:05}".format(
+        cra_env=cra_env, cra_sequence=cra_sequence, program_code=program_code
+    )
+    print(filename)
+    return filename
+
+
+def upload_to_s3(file):
+    AWS_ACCESS_KEY_ID = 'nr-itvr-tst'
+    AWS_S3_ENDPOINT_URL = 'https://nrs.objectstore.gov.bc.ca:443'
+    AWS_SECRET_ACCESS_KEY = 'xVNKLDynorU12GYSTNfWvo2plBVxp6Wl2xsTwHSj'
+
+    client = boto3.client(
+        's3',
+        aws_access_key_id=AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+        endpoint_url=AWS_S3_ENDPOINT_URL
+    )
+
+    BUCKET_NAME = 'itvrts'
+    UPLOAD_FOLDER_NAME = 'cra/encrypt'
+
+    client.upload_file(file, BUCKET_NAME, '%s/%s' % (UPLOAD_FOLDER_NAME, file))
+
