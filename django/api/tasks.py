@@ -482,7 +482,6 @@ def cancel_untouched_household_applications():
 
 
 def expire_expired_applications():
-    print('hello')
     expired_rebates = GoElectricRebate.objects.filter(redeemed=False).filter(
         expiry_date__lte=timezone.now().date()
     )
@@ -551,7 +550,6 @@ def get_cra_filename(program_code="BCVR", cra_env="A", cra_sequence="00001"):
     filename = "TO.{cra_env}TO#@@00.R7005.IN.{program_code}.{cra_env}{cra_sequence:05}".format(
         cra_env=cra_env, cra_sequence=cra_sequence, program_code=program_code
     )
-    print(filename)
     return filename
 
 
@@ -609,7 +607,6 @@ def download_from_s3():
         associated_applications = get_applications(rebates)
         save_rebates(rebates, associated_applications)
         update_application_statuses(rebates, associated_applications)
-        print(data)
         return data
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == "404":
