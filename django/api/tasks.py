@@ -26,6 +26,9 @@ from sequences import get_next_value
 from .services import cra
 from datetime import date
 import boto3
+import botocore
+from .services.rebate import get_applications, save_rebates, update_application_statuses
+from .services.calculate_rebate import get_cra_results
 import os
 
 def get_email_service_token() -> str:
@@ -569,3 +572,52 @@ def upload_to_s3(file):
 
     client.upload_file(file, BUCKET_NAME, '%s/%s' % (UPLOAD_FOLDER_NAME, file))
 
+def download_from_s3():
+    # Download file from s3
+    AWS_ACCESS_KEY_ID = 'nr-itvr-tst'
+    AWS_S3_ENDPOINT_URL = 'https://nrs.objectstore.gov.bc.ca:443'
+    AWS_SECRET_ACCESS_KEY = 'xVNKLDynorU12GYSTNfWvo2plBVxp6Wl2xsTwHSj'
+
+    client = boto3.client(
+        's3',
+        aws_access_key_id=AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+        endpoint_url = AWS_S3_ENDPOINT_URL
+    )
+    resource = boto3.resource(
+        's3',
+        aws_access_key_id=AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+        endpoint_url = AWS_S3_ENDPOINT_URL
+    )
+
+    BUCKET_NAME = 'itvrts'
+    DOWNLOAD_FOLDER_NAME = 'cra/decrypt'
+
+    my_bucket = resource.Bucket(BUCKET_NAME)
+    files = my_bucket.objects.filter(Prefix=DOWNLOAD_FOLDER_NAME)
+    object = [obj.key for obj in sorted(files, key=lambda x: x.last_modified,
+        reverse=True)][0]
+    file = object.split('/')[-1]
+
+    try:
+        client.download_file(BUCKET_NAME, object, file)
+        return file
+    except botocore.exceptions.ClientError as e:
+        if e.response['Error']['Code'] == "404":
+            print("The object does not exist.")
+        else:
+            raise
+
+def update_db_records():
+    file = download_from_s3()
+    path = os.path.join(os.path.expanduser('../'), file)
+    # file = '../' + file
+    print(path)
+    file_contents = path.read().decode("utf-8")
+    print(file_contents)
+    # data = cra.read(file_contents)
+    # rebates = get_cra_results(data)
+    # associated_applications = get_applications(rebates)
+    # save_rebates(rebates, associated_applications)
+    # update_application_statuses(rebates, associated_applications)
