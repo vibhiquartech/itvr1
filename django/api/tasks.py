@@ -30,7 +30,7 @@ import botocore
 from .services.rebate import get_applications, save_rebates, update_application_statuses
 from .services.calculate_rebate import get_cra_results
 import os
-
+from io import BytesIO
 def get_email_service_token() -> str:
     client_id = settings.EMAIL["EMAIL_SERVICE_CLIENT_ID"]
     client_secret = settings.EMAIL["EMAIL_SERVICE_CLIENT_SECRET"]
@@ -602,22 +602,17 @@ def download_from_s3():
 
     try:
         client.download_file(BUCKET_NAME, object, file)
-        return file
+        obj = resource.Object(BUCKET_NAME, object)
+        dataa = obj.get()['Body'].read().decode("utf-8")
+        data = cra.read(dataa)
+        rebates = get_cra_results(data)
+        associated_applications = get_applications(rebates)
+        save_rebates(rebates, associated_applications)
+        update_application_statuses(rebates, associated_applications)
+        print(data)
+        return data
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == "404":
             print("The object does not exist.")
         else:
             raise
-
-def update_db_records():
-    file = download_from_s3()
-    path = os.path.join(os.path.expanduser('../'), file)
-    # file = '../' + file
-    print(path)
-    file_contents = path.read().decode("utf-8")
-    print(file_contents)
-    # data = cra.read(file_contents)
-    # rebates = get_cra_results(data)
-    # associated_applications = get_applications(rebates)
-    # save_rebates(rebates, associated_applications)
-    # update_application_statuses(rebates, associated_applications)
