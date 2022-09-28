@@ -554,55 +554,41 @@ def get_cra_filename(program_code="BCVR", cra_env="A", cra_sequence="00001"):
 
 
 def upload_to_s3(file):
-    AWS_ACCESS_KEY_ID = 'nr-itvr-tst'
-    AWS_S3_ENDPOINT_URL = 'https://nrs.objectstore.gov.bc.ca:443'
-    AWS_SECRET_ACCESS_KEY = 'xVNKLDynorU12GYSTNfWvo2plBVxp6Wl2xsTwHSj'
 
     client = boto3.client(
         's3',
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        endpoint_url=AWS_S3_ENDPOINT_URL
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_S3_ENDPOINT_URL,
+        endpoint_url=settings.AWS_SECRET_ACCESS_KEY
     )
 
-    BUCKET_NAME = 'itvrts'
+    BUCKET_NAME = settings.AWS_STORAGE_BUCKET_NAME
     UPLOAD_FOLDER_NAME = 'cra/encrypt'
 
     client.upload_file(file, BUCKET_NAME, '%s/%s' % (UPLOAD_FOLDER_NAME, file))
 
 def download_from_s3():
-    # Download file from s3
-    AWS_ACCESS_KEY_ID = 'nr-itvr-tst'
-    AWS_S3_ENDPOINT_URL = 'https://nrs.objectstore.gov.bc.ca:443'
-    AWS_SECRET_ACCESS_KEY = 'xVNKLDynorU12GYSTNfWvo2plBVxp6Wl2xsTwHSj'
 
-    client = boto3.client(
-        's3',
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        endpoint_url = AWS_S3_ENDPOINT_URL
-    )
+    # Download file from s3
     resource = boto3.resource(
         's3',
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        endpoint_url = AWS_S3_ENDPOINT_URL
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_S3_ENDPOINT_URL,
+        endpoint_url=settings.AWS_SECRET_ACCESS_KEY
     )
 
-    BUCKET_NAME = 'itvrts'
+    BUCKET_NAME = settings.AWS_STORAGE_BUCKET_NAME
     DOWNLOAD_FOLDER_NAME = 'cra/decrypt'
 
     my_bucket = resource.Bucket(BUCKET_NAME)
     files = my_bucket.objects.filter(Prefix=DOWNLOAD_FOLDER_NAME)
-    object = [obj.key for obj in sorted(files, key=lambda x: x.last_modified,
+    latest_object = [obj.key for obj in sorted(files, key=lambda x: x.last_modified,
         reverse=True)][0]
-    file = object.split('/')[-1]
 
     try:
-        client.download_file(BUCKET_NAME, object, file)
-        obj = resource.Object(BUCKET_NAME, object)
-        dataa = obj.get()['Body'].read().decode("utf-8")
-        data = cra.read(dataa)
+        file = resource.Object(BUCKET_NAME, latest_object)
+        obj_body = file.get()['Body'].read().decode("utf-8")
+        data = cra.read(obj_body)
         rebates = get_cra_results(data)
         associated_applications = get_applications(rebates)
         save_rebates(rebates, associated_applications)
